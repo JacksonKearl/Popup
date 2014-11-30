@@ -2,25 +2,27 @@
 #import "BackgroundView.h"
 #import "StatusItemView.h"
 #import "MenubarController.h"
+#import <ScriptingBridge/ScriptingBridge.h>
+#import "iTunes.h"
 
-#define OPEN_DURATION .15
-#define CLOSE_DURATION .1
+#define OPEN_DURATION 0
+#define CLOSE_DURATION 0
 
 #define SEARCH_INSET 17
 
-#define POPUP_HEIGHT 122
-#define PANEL_WIDTH 280
+#define POPUP_HEIGHT 120
+#define PANEL_WIDTH 25
 #define MENU_ANIMATION_DURATION .1
 
 #pragma mark -
 
 @implementation PanelController
-
+/*
 @synthesize backgroundView = _backgroundView;
 @synthesize delegate = _delegate;
 @synthesize searchField = _searchField;
 @synthesize textField = _textField;
-
+*/
 #pragma mark -
 
 - (id)initWithDelegate:(id<PanelControllerDelegate>)delegate
@@ -33,10 +35,7 @@
     return self;
 }
 
-- (void)dealloc
-{
-    [[NSNotificationCenter defaultCenter] removeObserver:self name:NSControlTextDidChangeNotification object:self.searchField];
-}
+
 
 #pragma mark -
 
@@ -51,8 +50,6 @@
     [panel setOpaque:NO];
     [panel setBackgroundColor:[NSColor clearColor]];
     
-    // Follow search string
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(runSearch) name:NSControlTextDidChangeNotification object:self.searchField];
 }
 
 #pragma mark - Public accessors
@@ -105,36 +102,7 @@
     
     self.backgroundView.arrowX = panelX;
     
-    NSRect searchRect = [self.searchField frame];
-    searchRect.size.width = NSWidth([self.backgroundView bounds]) - SEARCH_INSET * 2;
-    searchRect.origin.x = SEARCH_INSET;
-    searchRect.origin.y = NSHeight([self.backgroundView bounds]) - ARROW_HEIGHT - SEARCH_INSET - NSHeight(searchRect);
-    
-    if (NSIsEmptyRect(searchRect))
-    {
-        [self.searchField setHidden:YES];
-    }
-    else
-    {
-        [self.searchField setFrame:searchRect];
-        [self.searchField setHidden:NO];
-    }
-    
-    NSRect textRect = [self.textField frame];
-    textRect.size.width = NSWidth([self.backgroundView bounds]) - SEARCH_INSET * 2;
-    textRect.origin.x = SEARCH_INSET;
-    textRect.size.height = NSHeight([self.backgroundView bounds]) - ARROW_HEIGHT - SEARCH_INSET * 3 - NSHeight(searchRect);
-    textRect.origin.y = SEARCH_INSET;
-    
-    if (NSIsEmptyRect(textRect))
-    {
-        [self.textField setHidden:YES];
-    }
-    else
-    {
-        [self.textField setFrame:textRect];
-        [self.textField setHidden:NO];
-    }
+
 }
 
 #pragma mark - Keyboard
@@ -144,17 +112,7 @@
     self.hasActivePanel = NO;
 }
 
-- (void)runSearch
-{
-    NSString *searchFormat = @"";
-    NSString *searchString = [self.searchField stringValue];
-    if ([searchString length] > 0)
-    {
-        searchFormat = NSLocalizedString(@"Search for ‘%@’…", @"Format for search request");
-    }
-    NSString *searchRequest = [NSString stringWithFormat:searchFormat, searchString];
-    [self.textField setStringValue:searchRequest];
-}
+
 
 #pragma mark - Public methods
 
@@ -183,9 +141,19 @@
     return statusRect;
 }
 
+- (IBAction)vol:(id)sender {
+    NSLog(@"Vol = %ld", _volCont.integerValue );
+    id iTunes = [SBApplication applicationWithBundleIdentifier:@"com.apple.iTunes"];
+    [iTunes setSoundVolume:_volCont.integerValue];
+}
+
+
+
 - (void)openPanel
 {
     NSWindow *panel = [self window];
+    id iTunes = [SBApplication applicationWithBundleIdentifier:@"com.apple.iTunes"];
+    [_volCont setIntegerValue:[iTunes soundVolume]];
     
     NSRect screenRect = [[[NSScreen screens] objectAtIndex:0] frame];
     NSRect statusRect = [self statusRectForWindow:panel];
@@ -206,21 +174,8 @@
     
     NSTimeInterval openDuration = OPEN_DURATION;
     
-    NSEvent *currentEvent = [NSApp currentEvent];
-    if ([currentEvent type] == NSLeftMouseDown)
-    {
-        NSUInteger clearFlags = ([currentEvent modifierFlags] & NSDeviceIndependentModifierFlagsMask);
-        BOOL shiftPressed = (clearFlags == NSShiftKeyMask);
-        BOOL shiftOptionPressed = (clearFlags == (NSShiftKeyMask | NSAlternateKeyMask));
-        if (shiftPressed || shiftOptionPressed)
-        {
-            openDuration *= 10;
-            
-            if (shiftOptionPressed)
-                NSLog(@"Icon is at %@\n\tMenu is on screen %@\n\tWill be animated to %@",
-                      NSStringFromRect(statusRect), NSStringFromRect(screenRect), NSStringFromRect(panelRect));
-        }
-    }
+
+    
     
     [NSAnimationContext beginGrouping];
     [[NSAnimationContext currentContext] setDuration:openDuration];
@@ -228,7 +183,7 @@
     [[panel animator] setAlphaValue:1];
     [NSAnimationContext endGrouping];
     
-    [panel performSelector:@selector(makeFirstResponder:) withObject:self.searchField afterDelay:openDuration];
+
 }
 
 - (void)closePanel
